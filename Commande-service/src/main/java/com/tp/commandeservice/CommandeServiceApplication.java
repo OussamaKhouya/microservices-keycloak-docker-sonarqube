@@ -24,45 +24,49 @@ public class CommandeServiceApplication {
 		SpringApplication.run(CommandeServiceApplication.class, args);
 	}
 
-	@Bean
-	CommandLineRunner commandLineRunner(CommandeService commandeService) {
-		return args -> {
-
-			OrderItem item1 = OrderItem.builder()
-					.productId(1L)
-					.quantity(2)
-					.price(1200.00)
-					.build();
-
-			OrderItem item2 = OrderItem.builder()
-					.productId(2L)
-					.quantity(1)
-					.price(800.00)
-					.build();
-
-			Commande c1 = Commande.builder()
-					.orderDate(LocalDateTime.now())
-					.status(OrderStatus.CREATED)
-					.totalAmount(3200.00)
-					.orderItems(List.of(item1, item2))
-					.build();
-
-			commandeService.createCommande(c1);
-
-			OrderItem item3 = OrderItem.builder()
-					.productId(1L)
-					.quantity(1)
-					.price(1200.00)
-					.build();
-
-			Commande c2 = Commande.builder()
-					.orderDate(LocalDateTime.now().minusDays(1))
-					.status(OrderStatus.CONFIRMED)
-					.totalAmount(1200.00)
-					.orderItems(List.of(item3))
-					.build();
-
-			commandeService.createCommande(c2);
-		};
-	}
+	// CommandLineRunner commented out because it requires authenticated context
+	// to call the secured product-service. Uncomment if needed for testing.
+	/*
+	 * @Bean
+	 * CommandLineRunner commandLineRunner(CommandeService commandeService) {
+	 * return args -> {
+	 * 
+	 * OrderItem item1 = OrderItem.builder()
+	 * .productId(1L)
+	 * .quantity(2)
+	 * .price(1200.00)
+	 * .build();
+	 * 
+	 * OrderItem item2 = OrderItem.builder()
+	 * .productId(2L)
+	 * .quantity(1)
+	 * .price(800.00)
+	 * .build();
+	 * 
+	 * Commande c1 = Commande.builder()
+	 * .orderDate(LocalDateTime.now())
+	 * .status(OrderStatus.CREATED)
+	 * .totalAmount(3200.00)
+	 * .orderItems(List.of(item1, item2))
+	 * .build();
+	 * 
+	 * commandeService.createCommande(c1);
+	 * 
+	 * OrderItem item3 = OrderItem.builder()
+	 * .productId(1L)
+	 * .quantity(1)
+	 * .price(1200.00)
+	 * .build();
+	 * 
+	 * Commande c2 = Commande.builder()
+	 * .orderDate(LocalDateTime.now().minusDays(1))
+	 * .status(OrderStatus.CONFIRMED)
+	 * .totalAmount(1200.00)
+	 * .orderItems(List.of(item3))
+	 * .build();
+	 * 
+	 * commandeService.createCommande(c2);
+	 * };
+	 * }
+	 */
 }
