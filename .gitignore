@@ -1,0 +1,22 @@
+# Maven wrapper
+mvnw
+mvnw.cmd
+.mvn/
+
+# Build output
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# H2 database
+*.db
