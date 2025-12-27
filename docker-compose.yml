@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  discovery-service:
+    build: ./discovery-service
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+
+  gateway-service:
+    build: ./gateway-service
+    ports:
+      - "8888:8888"
+    environment:
+      - EUREKA_URI=http://discovery-service:8761/eureka
+      # On utilise keycloak en interne pour les appels direct (JWK), mais le token aura iss=localhost
+      # L'astuce est souvent de ne pas valider l'issuer strictement ou d'utiliser le meme nom partout
+      - KEYCLOAK_URL=http://keycloak:8080/realms/microservices-realm
+      - FRONTEND_URL=http://localhost:4200
+    depends_on:
+      - discovery-service
+      - keycloak
+
+  product-service:
+    build: ./product-service
+    ports:
+      - "8081:8081" 
+    environment:
+      - EUREKA_URI=http://discovery-service:8761/eureka
+      - KEYCLOAK_URL=http://keycloak:8080/realms/microservices-realm
+    depends_on:
+      - discovery-service
+      - keycloak
+
+  commande-service:
+    build: ./Commande-service
+    ports:
+      - "8082:8082"
+    environment:
+      - EUREKA_URI=http://discovery-service:8761/eureka
+      - KEYCLOAK_URL=http://keycloak:8080/realms/microservices-realm
+    depends_on:
+      - discovery-service
+      - keycloak
+
+  frontend-angular:
+    build: ./frontend-angular
+    ports:
+      - "4200:80"
+    depends_on:
+      - gateway-service
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.0
+    command: start-dev --import-realm
+    volumes:
+      - ./keycloak-data:/opt/keycloak/data/import
+    environment:
+      - KC_BOOTSTRAP_ADMIN_USERNAME=admin
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
+      - KC_HTTP_PORT=8080
+      # Permet l'accès via localhost (navigateur) ET nom du conteneur (backend)
+      # Mais attention à l'issuer du token !
+      # En dev mode, keycloak est assez permissif.
+    ports:
+      - "8080:8080"
