@@ -1,1 +1,3 @@
+com\tp\gatewayservice\config\SecurityConfig.class
 com\tp\gatewayservice\GatewayServiceApplication.class
+com\tp\gatewayservice\config\SecurityConfig$KeycloakRoleConverter.class

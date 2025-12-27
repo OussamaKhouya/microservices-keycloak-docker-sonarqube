@@ -1,10 +1,11 @@
 import { Product } from './product.model';
 
 export interface OrderItem {
-    id?: number;
+    id: number;
     productId: number;
     quantity: number;
-    unitPrice?: number;
+    price?: number;     // Correspond au backend
+    unitPrice?: number; // Alias ancien si nécessaire, mais on préfère price
     product?: Product;
 }
 
@@ -13,5 +14,5 @@ export interface Order {
     orderDate?: string;
     status?: string;
     totalAmount?: number;
-    orderItems?: OrderItem[];
+    orderItems: OrderItem[];
 }

@@ -1,527 +1,234 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { ProductService } from '../../services/product.service';
 import { OrderService } from '../../services/order.service';
+import { CartService } from '../../services/cart.service';
 import { KeycloakService } from '../../services/keycloak.service';
 import { Product } from '../../models/product.model';
+import { Router } from '@angular/router';
 
 @Component({
-    selector: 'app-products',
-    standalone: true,
-    imports: [CommonModule, RouterModule],
-    template: `
-    <div class="products-page">
-      <header class="page-header">
-        <div class="header-content">
-          <h1>📦 Catalogue des Produits</h1>
-          <p>Découvrez notre sélection de produits de qualité</p>
-        </div>
+  selector: 'app-products',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
+    <div class="container" [class.has-cart]="cartService.totalItems() > 0">
+      <div class="header">
+        <h1>Produits</h1>
         @if (keycloakService.isAdmin()) {
-          <button class="btn-add" (click)="toggleAddForm()">
-            <span>➕</span>
-            Ajouter un produit
-          </button>
+          <button class="btn-primary" (click)="openAdd()">+ Nouveau Produit</button>
         }
-      </header>
+      </div>
 
-      @if (showAddForm()) {
-        <div class="add-form-container">
-          <div class="add-form">
-            <h3>Nouveau Produit</h3>
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Nom</label>
-                <input type="text" #nameInput placeholder="Nom du produit">
-              </div>
-              <div class="form-group">
-                <label>Prix (€)</label>
-                <input type="number" #priceInput placeholder="0.00">
-              </div>
-              <div class="form-group">
-                <label>Stock</label>
-                <input type="number" #stockInput placeholder="0">
-              </div>
-              <div class="form-group full-width">
-                <label>Description</label>
-                <textarea #descInput placeholder="Description du produit"></textarea>
-              </div>
+      <!-- Formulaire Ajout / Edition -->
+      @if (showForm()) {
+        <div class="card form-card">
+          <h3>{{ editingId() ? 'Modifier le produit' : 'Nouveau produit' }}</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Nom</label>
+              <input type="text" [value]="formData().name" (input)="updateField('name', $event)">
             </div>
-            <div class="form-actions">
-              <button class="btn-cancel" (click)="toggleAddForm()">Annuler</button>
-              <button class="btn-save" (click)="addProduct(nameInput.value, descInput.value, +priceInput.value, +stockInput.value)">
-                Sauvegarder
-              </button>
+            <div class="form-group">
+              <label>Prix (€)</label>
+              <input type="number" [value]="formData().price" (input)="updateField('price', $event)">
             </div>
+            <div class="form-group">
+              <label>Stock</label>
+              <input type="number" [value]="formData().stockQuantity" (input)="updateField('stockQuantity', $event)">
+            </div>
+            <div class="form-group full">
+              <label>Description</label>
+              <textarea [value]="formData().description" (input)="updateField('description', $event)"></textarea>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn-secondary" (click)="cancelForm()">Annuler</button>
+            <button class="btn-success" (click)="submitForm()">Sauvegarder</button>
           </div>
         </div>
       }
 
-      @if (loading()) {
-        <div class="loading-container">
-          <div class="loading-spinner"></div>
-          <p>Chargement des produits...</p>
-        </div>
-      } @else if (error()) {
-        <div class="error-container">
-          <span class="error-icon">⚠️</span>
-          <p>{{ error() }}</p>
-          <button class="btn-retry" (click)="loadProducts()">Réessayer</button>
-        </div>
-      } @else {
-        <div class="products-grid">
-          @for (product of products(); track product.id) {
-            <div class="product-card">
-              <div class="product-image">
-                <span class="product-emoji">{{ getProductEmoji(product.name) }}</span>
-              </div>
-              <div class="product-info">
-                <h3 class="product-name">{{ product.name }}</h3>
-                <p class="product-description">{{ product.description }}</p>
-                <div class="product-meta">
-                  <span class="product-price">{{ product.price | currency:'EUR' }}</span>
-                  <span class="stock-badge" [class.low-stock]="product.stockQuantity < 10">
-                    {{ product.stockQuantity }} en stock
-                  </span>
-                </div>
-              </div>
-              <div class="product-actions">
-                <button class="btn-order" (click)="orderProduct(product)" [disabled]="product.stockQuantity === 0">
-                  <span>🛒</span>
-                  Commander
+      <div class="grid">
+        @for (product of products(); track product.id) {
+          <div class="card product-card">
+            <div class="product-header">
+              <h3>{{ product.name }}</h3>
+              <span class="price">{{ product.price | currency:'EUR' }}</span>
+            </div>
+            <p class="desc">{{ product.description }}</p>
+            <div class="meta">
+              <span [class.low-stock]="product.stockQuantity < 5">
+                Stock: {{ product.stockQuantity }}
+              </span>
+            </div>
+            
+            <div class="card-actions">
+              <div class="order-controls">
+                <input type="number" 
+                       min="1" 
+                       [max]="product.stockQuantity" 
+                       [ngModel]="quantities()[product.id] || 1" 
+                       (ngModelChange)="updateQuantity(product.id, $event)"
+                       class="qty-input">
+                <button class="btn-primary" 
+                        (click)="addToCart(product)"
+                        [disabled]="product.stockQuantity === 0">
+                  Ajouter au panier
                 </button>
-                @if (keycloakService.isAdmin()) {
-                  <button class="btn-delete" (click)="deleteProduct(product.id)">
-                    <span>🗑️</span>
-                  </button>
-                }
               </div>
+              
+              @if (keycloakService.isAdmin()) {
+                <div class="admin-actions">
+                  <button class="btn-secondary btn-sm" (click)="openEdit(product)">Edit</button>
+                  <button class="btn-danger btn-sm" (click)="deleteProduct(product.id)">Del</button>
+                </div>
+              }
             </div>
-          } @empty {
-            <div class="empty-state">
-              <span class="empty-icon">📭</span>
-              <p>Aucun produit disponible</p>
-            </div>
-          }
-        </div>
-      }
-
-      @if (orderSuccess()) {
-        <div class="toast success">
-          ✅ Commande créée avec succès !
-        </div>
-      }
+          </div>
+        }
+      </div>
     </div>
+
+    <!-- PANIER FLOTTANT -->
+    @if (cartService.totalItems() > 0) {
+      <div class="cart-bar">
+        <div class="cart-info">
+          <span class="cart-count">{{ cartService.totalItems() }} articles</span>
+          <span class="cart-total">Total: {{ cartService.totalPrice() | currency:'EUR' }}</span>
+        </div>
+        <div class="cart-items-preview">
+            @for (item of cartService.items(); track item.product.id) {
+                <span class="cart-item-tag">{{ item.product.name }} (x{{ item.quantity }})</span>
+            }
+        </div>
+        <div class="cart-actions">
+            <button class="btn-danger btn-sm" (click)="cartService.clearCart()">Vider</button>
+            <button class="btn-success" (click)="checkout()">Valider la commande</button>
+        </div>
+      </div>
+    }
   `,
-    styles: [`
-    .products-page {
-      padding: 2rem;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
+  styles: [`
+    .container { padding-bottom: 80px; } /* Space for cart bar */
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+    .product-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .price { font-weight: bold; color: #3f51b5; font-size: 1.2rem; }
+    .desc { color: #666; font-size: 0.9rem; margin-bottom: 15px; min-height: 40px; }
+    .meta { font-size: 0.85rem; color: #888; margin-bottom: 15px; }
+    .low-stock { color: #f44336; font-weight: bold; }
+    .card-actions { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 15px; }
+    .order-controls { display: flex; gap: 10px; align-items: center; }
+    .qty-input { width: 60px; padding: 6px; margin: 0; }
+    .admin-actions { display: flex; gap: 5px; }
+    .form-card { border-left: 4px solid #3f51b5; margin-bottom: 20px; }
+    .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 15px 0; }
+    .form-group.full { grid-column: 1 / -1; }
+    .actions { display: flex; justify-content: flex-end; gap: 10px; }
+    .btn-sm { padding: 4px 8px; font-size: 0.8rem; }
 
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-      padding-bottom: 1.5rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .header-content h1 {
-      font-size: 2rem;
-      color: white;
-      margin-bottom: 0.5rem;
-    }
-
-    .header-content p {
-      color: rgba(255, 255, 255, 0.6);
-    }
-
-    .btn-add {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.8rem 1.5rem;
-      border: none;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #00d9ff, #00ff88);
-      color: #1a1a2e;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-
-    .btn-add:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 10px 30px rgba(0, 217, 255, 0.3);
-    }
-
-    .add-form-container {
-      margin-bottom: 2rem;
-    }
-
-    .add-form {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 16px;
-      padding: 1.5rem;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .add-form h3 {
-      color: white;
-      margin-bottom: 1rem;
-    }
-
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1rem;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .form-group.full-width {
-      grid-column: 1 / -1;
-    }
-
-    .form-group label {
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.9rem;
-    }
-
-    .form-group input,
-    .form-group textarea {
-      padding: 0.75rem;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.3);
-      color: white;
-      font-size: 1rem;
-    }
-
-    .form-group textarea {
-      min-height: 80px;
-      resize: vertical;
-    }
-
-    .form-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-
-    .btn-cancel {
-      padding: 0.75rem 1.5rem;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      border-radius: 8px;
-      background: transparent;
-      color: white;
-      cursor: pointer;
-    }
-
-    .btn-save {
-      padding: 0.75rem 1.5rem;
-      border: none;
-      border-radius: 8px;
-      background: linear-gradient(135deg, #00d9ff, #00ff88);
-      color: #1a1a2e;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .loading-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 4rem;
-    }
-
-    .loading-spinner {
-      width: 50px;
-      height: 50px;
-      border: 3px solid rgba(255, 255, 255, 0.1);
-      border-top-color: #00d9ff;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .loading-container p {
-      margin-top: 1rem;
-      color: rgba(255, 255, 255, 0.6);
-    }
-
-    .error-container {
-      text-align: center;
-      padding: 4rem;
-      color: #ff6b6b;
-    }
-
-    .error-icon {
-      font-size: 3rem;
-    }
-
-    .btn-retry {
-      margin-top: 1rem;
-      padding: 0.75rem 1.5rem;
-      border: none;
-      border-radius: 8px;
-      background: #ff6b6b;
-      color: white;
-      cursor: pointer;
-    }
-
-    .products-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 1.5rem;
-    }
-
-    .product-card {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 20px;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      transition: all 0.3s ease;
-    }
-
-    .product-card:hover {
-      transform: translateY(-5px);
-      border-color: rgba(0, 217, 255, 0.3);
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    }
-
-    .product-image {
-      height: 160px;
-      background: linear-gradient(135deg, #1a1a2e, #16213e);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .product-emoji {
-      font-size: 4rem;
-    }
-
-    .product-info {
-      padding: 1.5rem;
-    }
-
-    .product-name {
-      font-size: 1.25rem;
-      color: white;
-      margin-bottom: 0.5rem;
-    }
-
-    .product-description {
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 0.9rem;
-      line-height: 1.5;
-      margin-bottom: 1rem;
-    }
-
-    .product-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .product-price {
-      font-size: 1.5rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, #00d9ff, #00ff88);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .stock-badge {
-      padding: 0.25rem 0.75rem;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      background: rgba(0, 255, 136, 0.2);
-      color: #00ff88;
-    }
-
-    .stock-badge.low-stock {
-      background: rgba(255, 107, 107, 0.2);
-      color: #ff6b6b;
-    }
-
-    .product-actions {
-      padding: 1rem 1.5rem;
-      background: rgba(0, 0, 0, 0.2);
-      display: flex;
-      gap: 0.75rem;
-    }
-
-    .btn-order {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      padding: 0.75rem;
-      border: none;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #00d9ff, #00ff88);
-      color: #1a1a2e;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-
-    .btn-order:hover:not(:disabled) {
-      transform: scale(1.02);
-    }
-
-    .btn-order:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .btn-delete {
-      padding: 0.75rem;
-      border: none;
-      border-radius: 10px;
-      background: rgba(255, 107, 107, 0.2);
-      color: #ff6b6b;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-
-    .btn-delete:hover {
-      background: #ff6b6b;
-      color: white;
-    }
-
-    .empty-state {
-      grid-column: 1 / -1;
-      text-align: center;
-      padding: 4rem;
-      color: rgba(255, 255, 255, 0.5);
-    }
-
-    .empty-icon {
-      font-size: 4rem;
-    }
-
-    .toast {
+    /* CART BAR STYLES */
+    .cart-bar {
       position: fixed;
-      bottom: 2rem;
-      right: 2rem;
-      padding: 1rem 1.5rem;
-      border-radius: 12px;
-      font-weight: 500;
-      animation: slideIn 0.3s ease;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #333;
+      color: white;
+      padding: 15px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+      z-index: 1000;
+      animation: slideUp 0.3s ease-out;
     }
 
-    .toast.success {
-      background: rgba(0, 255, 136, 0.2);
-      color: #00ff88;
-      border: 1px solid rgba(0, 255, 136, 0.3);
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
     }
 
-    @keyframes slideIn {
-      from {
-        transform: translateX(100%);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
+    .cart-info { display: flex; gap: 20px; align-items: center; font-size: 1.1rem; font-weight: bold; }
+    .cart-count { background: #f50057; padding: 2px 8px; border-radius: 12px; font-size: 0.9rem; }
+    .cart-items-preview { display: flex; gap: 10px; overflow-x: auto; max-width: 40%; font-size: 0.9rem; color: #ccc; }
+    .cart-item-tag { white-space: nowrap; }
+    .cart-actions { display: flex; gap: 10px; }
   `]
 })
 export class ProductsComponent implements OnInit {
-    private readonly productService = inject(ProductService);
-    private readonly orderService = inject(OrderService);
-    keycloakService = inject(KeycloakService);
+  productService = inject(ProductService);
+  orderService = inject(OrderService);
+  keycloakService = inject(KeycloakService);
+  cartService = inject(CartService);
+  router = inject(Router);
 
-    products = signal<Product[]>([]);
-    loading = signal(true);
-    error = signal<string | null>(null);
-    showAddForm = signal(false);
-    orderSuccess = signal(false);
+  products = signal<Product[]>([]);
+  quantities = signal<{ [key: number]: number }>({});
 
-    ngOnInit(): void {
-        this.loadProducts();
-    }
+  showForm = signal(false);
+  editingId = signal<number | null>(null);
+  formData = signal<any>({ name: '', description: '', price: 0, stockQuantity: 0 });
 
-    loadProducts(): void {
-        this.loading.set(true);
-        this.error.set(null);
+  ngOnInit() {
+    this.loadProducts();
+  }
 
-        this.productService.getAllProducts().subscribe({
-            next: (data) => {
-                this.products.set(data);
-                this.loading.set(false);
-            },
-            error: (err) => {
-                this.error.set('Erreur lors du chargement des produits');
-                this.loading.set(false);
-                console.error(err);
-            }
-        });
-    }
+  loadProducts() {
+    this.productService.getAllProducts().subscribe(data => this.products.set(data));
+  }
 
-    getProductEmoji(name: string): string {
-        const lower = name.toLowerCase();
-        if (lower.includes('laptop') || lower.includes('ordinateur')) return '💻';
-        if (lower.includes('phone') || lower.includes('smartphone')) return '📱';
-        if (lower.includes('tablet') || lower.includes('tablette')) return '📱';
-        if (lower.includes('watch') || lower.includes('montre')) return '⌚';
-        if (lower.includes('headphone') || lower.includes('casque')) return '🎧';
-        if (lower.includes('camera')) return '📷';
-        if (lower.includes('keyboard') || lower.includes('clavier')) return '⌨️';
-        if (lower.includes('mouse') || lower.includes('souris')) return '🖱️';
-        return '📦';
-    }
+  updateQuantity(productId: number, qty: number) {
+    this.quantities.update(curr => ({ ...curr, [productId]: qty }));
+  }
 
-    toggleAddForm(): void {
-        this.showAddForm.update(v => !v);
-    }
+  addToCart(product: Product) {
+    const qty = this.quantities()[product.id] || 1;
+    this.cartService.addToCart(product, qty);
 
-    addProduct(name: string, description: string, price: number, stock: number): void {
-        const product: Product = { id: 0, name, description, price, stockQuantity: stock };
-        this.productService.createProduct(product).subscribe({
-            next: () => {
-                this.loadProducts();
-                this.showAddForm.set(false);
-            },
-            error: (err) => console.error(err)
-        });
-    }
+    // Reset quantity input to 1 safely
+    this.quantities.update(curr => {
+      const next = { ...curr };
+      delete next[product.id];
+      return next;
+    });
+  }
 
-    deleteProduct(id: number): void {
-        if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
-            this.productService.deleteProduct(id).subscribe({
-                next: () => this.loadProducts(),
-                error: (err) => console.error(err)
-            });
+  checkout() {
+    if (confirm(`Confirmer la commande de ${this.cartService.totalItems()} articles pour ${this.cartService.totalPrice()} € ?`)) {
+      const orderItems = this.cartService.items().map(item => ({
+        productId: item.product.id,
+        quantity: item.quantity
+      }));
+
+      this.orderService.createOrder(orderItems).subscribe({
+        next: () => {
+          alert('Commande validée !');
+          this.cartService.clearCart();
+          this.router.navigate(['/orders']); // Redirect to orders page
+        },
+        error: (err) => {
+          console.error(err);
+          alert('Erreur lors de la commande');
         }
+      });
     }
+  }
 
-    orderProduct(product: Product): void {
-        this.orderService.createOrder({ productId: product.id, quantity: 1 }).subscribe({
-            next: () => {
-                this.orderSuccess.set(true);
-                setTimeout(() => this.orderSuccess.set(false), 3000);
-                this.loadProducts();
-            },
-            error: (err) => console.error(err)
-        });
+  // --- Form Logic ---
+  updateField(field: string, event: Event) { this.formData.update(curr => ({ ...curr, [field]: (event.target as HTMLInputElement).value })); }
+  openAdd() { this.editingId.set(null); this.formData.set({ name: '', description: '', price: 0, stockQuantity: 0 }); this.showForm.set(true); }
+  openEdit(product: Product) { this.editingId.set(product.id); this.formData.set({ ...product }); this.showForm.set(true); }
+  cancelForm() { this.showForm.set(false); }
+  submitForm() {
+    const data = this.formData();
+    if (this.editingId()) {
+      this.productService.updateProduct(this.editingId()!, { ...data, id: this.editingId()! }).subscribe(() => { this.loadProducts(); this.showForm.set(false); });
+    } else {
+      this.productService.createProduct({ ...data, id: 0 }).subscribe(() => { this.loadProducts(); this.showForm.set(false); });
     }
+  }
+  deleteProduct(id: number) { if (confirm('Supprimer ?')) this.productService.deleteProduct(id).subscribe(() => this.loadProducts()); }
 }

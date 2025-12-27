@@ -23,7 +23,18 @@ public class CommandeService {
     }
 
     public Commande getCommandeById(Long id) {
-        return commandeRepository.findById(id).orElse(null);
+        Commande commande = commandeRepository.findById(id).orElse(null);
+        if (commande != null && commande.getOrderItems() != null) {
+            commande.getOrderItems().forEach(item -> {
+                try {
+                    Product product = productRestClient.getProductById(item.getProductId());
+                    item.setProduct(product);
+                } catch (Exception e) {
+                    // Ignore if product not found or service down
+                }
+            });
+        }
+        return commande;
     }
 
     public Commande createCommande(Commande commande) {
@@ -45,6 +56,7 @@ public class CommandeService {
 
                 // Update item price from product service source of truth
                 item.setPrice(product.getPrice());
+                item.setProduct(product); // Set for response
 
                 total += item.getPrice() * item.getQuantity();
                 item.setCommande(commande);
@@ -71,6 +83,19 @@ public class CommandeService {
     }
 
     public List<Commande> getAllCommandes() {
-        return commandeRepository.findAll();
+        List<Commande> commandes = commandeRepository.findAll();
+        commandes.forEach(commande -> {
+            if (commande.getOrderItems() != null) {
+                commande.getOrderItems().forEach(item -> {
+                    try {
+                        Product product = productRestClient.getProductById(item.getProductId());
+                        item.setProduct(product);
+                    } catch (Exception e) {
+                        // Ignore
+                    }
+                });
+            }
+        });
+        return commandes;
     }
 }

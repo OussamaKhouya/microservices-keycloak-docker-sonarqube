@@ -21,4 +21,8 @@ public class OrderItem {
     @ManyToOne
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private Commande commande;
+
+    @Transient
+    private com.tp.commandeservice.model.Product product;
+
 }
