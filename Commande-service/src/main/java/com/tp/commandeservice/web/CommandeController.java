@@ -2,6 +2,7 @@ package com.tp.commandeservice.web;
 
 import com.tp.commandeservice.entities.Commande;
 import com.tp.commandeservice.services.CommandeService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,18 +18,18 @@ public class CommandeController {
     }
 
     @GetMapping
-    public List<Commande> getAllCommandes() {
-        return commandeService.getAllCommandes();
+    public List<Commande> getAllCommandes(Authentication authentication) {
+        return commandeService.getAllCommandes(authentication);
     }
 
     @GetMapping("/{id}")
-    public Commande getCommandeById(@PathVariable Long id) {
-        return commandeService.getCommandeById(id);
+    public Commande getCommandeById(@PathVariable Long id, Authentication authentication) {
+        return commandeService.getCommandeById(id, authentication);
     }
 
     @PostMapping
-    public Commande createCommande(@RequestBody Commande commande) {
-        return commandeService.createCommande(commande);
+    public Commande createCommande(@RequestBody Commande commande, Authentication authentication) {
+        return commandeService.createCommande(commande, authentication);
     }
 
     @PutMapping("/{id}")

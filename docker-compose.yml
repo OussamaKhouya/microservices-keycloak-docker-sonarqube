@@ -18,6 +18,8 @@ services:
       # L'astuce est souvent de ne pas valider l'issuer strictement ou d'utiliser le meme nom partout
       - KEYCLOAK_URL=http://keycloak:8080/realms/microservices-realm
       - FRONTEND_URL=http://localhost:4200
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://keycloak:8080/realms/microservices-realm
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/microservices-realm/protocol/openid-connect/certs
     depends_on:
       - discovery-service
       - keycloak
@@ -29,6 +31,7 @@ services:
     environment:
       - EUREKA_URI=http://discovery-service:8761/eureka
       - KEYCLOAK_URL=http://keycloak:8080/realms/microservices-realm
+      - KEYCLOAK_JWK_URI=http://keycloak:8080/realms/microservices-realm/protocol/openid-connect/certs
     depends_on:
       - discovery-service
       - keycloak
@@ -40,6 +43,8 @@ services:
     environment:
       - EUREKA_URI=http://discovery-service:8761/eureka
       - KEYCLOAK_URL=http://keycloak:8080/realms/microservices-realm
+      - KEYCLOAK_JWK_URI=http://keycloak:8080/realms/microservices-realm/protocol/openid-connect/certs
+      - PRODUCT_SERVICE_URL=http://product-service:8081
     depends_on:
       - discovery-service
       - keycloak
@@ -52,8 +57,8 @@ services:
       - gateway-service
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0.0
-    command: start-dev --import-realm
+    image: quay.io/keycloak/keycloak:26.4.7
+    command: start-dev --import-realm --features=preview,scripts
     volumes:
       - ./keycloak-data:/opt/keycloak/data/import
     environment:

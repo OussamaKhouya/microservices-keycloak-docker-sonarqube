@@ -1,5 +1,6 @@
 package com.tp.productservice.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -10,13 +11,22 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Configuration
@@ -60,6 +70,19 @@ public class SecurityConfig {
         return converter;
     }
 
+    @Bean
+    public JwtDecoder jwtDecoder(
+            @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:http://localhost:8080/realms/microservices-realm/protocol/openid-connect/certs}") String jwkSetUri,
+            @Value("${app.security.allowed-issuers:http://localhost:8080/realms/microservices-realm,http://keycloak:8080/realms/microservices-realm}") String allowedIssuers) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+
+        OAuth2TokenValidator<Jwt> withTimestamp = JwtValidators.createDefault();
+        OAuth2TokenValidator<Jwt> issuerValidator = new AllowedIssuersValidator(parseAllowedIssuers(allowedIssuers));
+
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(withTimestamp, issuerValidator));
+        return decoder;
+    }
+
     // Custom converter to extract roles from Keycloak JWT
     static class KeycloakRoleConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
         @Override
@@ -79,5 +102,31 @@ public class SecurityConfig {
                     .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
                     .collect(Collectors.toList());
         }
+    }
+
+    // Custom validator to accept tokens issued for localhost (external) or keycloak (inside Docker)
+    static class AllowedIssuersValidator implements OAuth2TokenValidator<Jwt> {
+        private final Set<String> allowedIssuers;
+
+        AllowedIssuersValidator(Set<String> allowedIssuers) {
+            this.allowedIssuers = allowedIssuers;
+        }
+
+        @Override
+        public OAuth2TokenValidatorResult validate(Jwt token) {
+            String issuer = token.getIssuer() != null ? token.getIssuer().toString() : null;
+            if (issuer != null && allowedIssuers.contains(issuer)) {
+                return OAuth2TokenValidatorResult.success();
+            }
+            OAuth2Error error = new OAuth2Error("invalid_token", "The iss claim is not allowed", null);
+            return OAuth2TokenValidatorResult.failure(error);
+        }
+    }
+
+    private Set<String> parseAllowedIssuers(String allowedIssuers) {
+        return Arrays.stream(allowedIssuers.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
     }
 }

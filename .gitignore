@@ -20,3 +20,5 @@ Thumbs.db
 
 # H2 database
 *.db
+reference_project/*
+target/*

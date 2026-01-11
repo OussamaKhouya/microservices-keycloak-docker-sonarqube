@@ -7,9 +7,14 @@ import com.tp.commandeservice.model.Product;
 import com.tp.commandeservice.repository.CommandeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -22,25 +27,23 @@ public class CommandeService {
         this.productRestClient = productRestClient;
     }
 
-    public Commande getCommandeById(Long id) {
+    public Commande getCommandeById(Long id, Authentication authentication) {
         Commande commande = commandeRepository.findById(id).orElse(null);
-        if (commande != null && commande.getOrderItems() != null) {
-            commande.getOrderItems().forEach(item -> {
-                try {
-                    Product product = productRestClient.getProductById(item.getProductId());
-                    item.setProduct(product);
-                } catch (Exception e) {
-                    // Ignore if product not found or service down
-                }
-            });
+        if (commande == null) {
+            return null;
         }
+        if (!isAdmin(authentication) && !commande.getUserId().equals(getUserId(authentication))) {
+            throw new AccessDeniedException("Not allowed to view this order");
+        }
+        enrichProducts(List.of(commande));
         return commande;
     }
 
-    public Commande createCommande(Commande commande) {
+    public Commande createCommande(Commande commande, Authentication authentication) {
         if (commande.getOrderDate() == null) {
             commande.setOrderDate(LocalDateTime.now());
         }
+        commande.setUserId(getUserId(authentication));
 
         double total = 0.0;
 
@@ -82,8 +85,15 @@ public class CommandeService {
         commandeRepository.deleteById(id);
     }
 
-    public List<Commande> getAllCommandes() {
-        List<Commande> commandes = commandeRepository.findAll();
+    public List<Commande> getAllCommandes(Authentication authentication) {
+        List<Commande> commandes = isAdmin(authentication)
+                ? commandeRepository.findAll()
+                : commandeRepository.findByUserId(getUserId(authentication));
+        enrichProducts(commandes);
+        return commandes;
+    }
+
+    private void enrichProducts(List<Commande> commandes) {
         commandes.forEach(commande -> {
             if (commande.getOrderItems() != null) {
                 commande.getOrderItems().forEach(item -> {
@@ -96,6 +106,22 @@ public class CommandeService {
                 });
             }
         });
-        return commandes;
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(auth -> auth.equals("ROLE_ADMIN"));
+    }
+
+    private String getUserId(Authentication authentication) {
+        if (authentication instanceof JwtAuthenticationToken jwtAuth) {
+            Object preferred = jwtAuth.getToken().getClaims().get("preferred_username");
+            if (preferred != null) {
+                return preferred.toString();
+            }
+            return jwtAuth.getName();
+        }
+        return authentication != null ? authentication.getName() : "unknown";
     }
 }

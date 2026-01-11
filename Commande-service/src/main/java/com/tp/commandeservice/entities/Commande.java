@@ -24,6 +24,9 @@ public class Commande {
 
     private Double totalAmount;
 
+    // Owner username (preferred_username from JWT)
+    private String userId;
+
     @OneToMany(mappedBy = "commande", cascade = CascadeType.ALL)
     private List<OrderItem> orderItems;
 }
