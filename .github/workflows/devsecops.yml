@@ -103,7 +103,7 @@ jobs:
       - name: Sonar scan
         if: ${{ env.SONAR_TOKEN != '' }}
         run: |
-          mvn -B -f ${{ matrix.service }}/pom.xml -DskipTests sonar:sonar \
+          mvn -B -f ${{ matrix.service }}/pom.xml -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:3.11.0.3922:sonar \
             -Dsonar.host.url=${SONAR_HOST_URL:-https://sonarcloud.io} \
             -Dsonar.login=$SONAR_TOKEN \
             $( [ -n "$SONAR_ORGANIZATION" ] && echo "-Dsonar.organization=$SONAR_ORGANIZATION" ) \
