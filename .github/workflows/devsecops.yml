@@ -107,5 +107,5 @@ jobs:
             -Dsonar.host.url=${SONAR_HOST_URL:-https://sonarcloud.io} \
             -Dsonar.login=$SONAR_TOKEN \
             $( [ -n "$SONAR_ORGANIZATION" ] && echo "-Dsonar.organization=$SONAR_ORGANIZATION" ) \
-            -Dsonar.projectKey=${{ github.repository }}-${{ matrix.service }} \
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}_${{ matrix.service }} \
             -Dsonar.projectName=${{ matrix.service }}
