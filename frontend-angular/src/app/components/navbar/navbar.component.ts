@@ -20,7 +20,7 @@ import { KeycloakService } from '../../services/keycloak.service';
         <div class="user-section">
           <span class="username">{{ keycloakService.getFullName() }}</span>
           <span class="role-badge" [class.admin]="keycloakService.isAdmin()">
-            {{ keycloakService.isAdmin() ? 'ADMIN' : 'USER' }}
+            {{ keycloakService.isAdmin() ? 'ADMIN' : 'CLIENT' }}
           </span>
           <button (click)="logout()" class="btn-logout">Déconnexion</button>
         </div>

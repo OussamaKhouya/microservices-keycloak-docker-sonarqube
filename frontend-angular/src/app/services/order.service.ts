@@ -9,7 +9,7 @@ import { environment } from '../../environments/environment';
 })
 export class OrderService {
     private readonly http = inject(HttpClient);
-    private readonly apiUrl = `${environment.apiGatewayUrl}/commande-service/api/commandes`;
+    private readonly apiUrl = `${environment.apiGatewayUrl}/order-service/api/orders`;
 
     getAllOrders(): Observable<Order[]> {
         return this.http.get<Order[]>(this.apiUrl);

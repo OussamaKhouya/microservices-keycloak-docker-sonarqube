@@ -16,7 +16,7 @@ graph TD
     subgraph "Zone Sécurisée (Docker Network)"
         Gateway -->|Route /auth| Keycloak[Keycloak Identity Provider]
         Gateway -->|LB /product| Product[Product Service]
-        Gateway -->|LB /order| Order[Commande Service]
+        Gateway -->|LB /order| Order[Order Service]
         
         Product -->|Register| Discovery[Eureka Discovery]
         Order -->|Register| Discovery
@@ -67,7 +67,7 @@ Vue de la base de données H2 pour les produits.
 Un utilisateur simple ne peut pas ajouter de produit (403 Forbidden).
 ![Forbidden Add Product](./screenshots/addProductasUser-forbidden.png)
 
-### 3. Gestion des Commandes (Commande-Service)
+### 3. Gestion des Commandes (Order-Service)
 
 **API REST Commandes**
 - Création et consultation des commandes :
@@ -106,4 +106,3 @@ Vue de la base de données H2 pour les commandes.
    - Frontend : [http://localhost:4200](http://localhost:4200)
    - Keycloak Console : [http://localhost:8080](http://localhost:8080)
    - Eureka Dashboard : [http://localhost:8761](http://localhost:8761)
-

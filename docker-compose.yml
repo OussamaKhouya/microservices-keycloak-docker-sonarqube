@@ -32,12 +32,16 @@ services:
       - EUREKA_URI=http://discovery-service:8761/eureka
       - KEYCLOAK_URL=http://keycloak:8080/realms/microservices-realm
       - KEYCLOAK_JWK_URI=http://keycloak:8080/realms/microservices-realm/protocol/openid-connect/certs
+      - PRODUCT_DB_URL=jdbc:postgresql://postgres-product:5432/productdb
+      - PRODUCT_DB_USERNAME=product_user
+      - PRODUCT_DB_PASSWORD=product_pass
     depends_on:
       - discovery-service
       - keycloak
+      - postgres-product
 
-  commande-service:
-    build: ./Commande-service
+  order-service:
+    build: ./order-service
     ports:
       - "8082:8082"
     environment:
@@ -45,16 +49,35 @@ services:
       - KEYCLOAK_URL=http://keycloak:8080/realms/microservices-realm
       - KEYCLOAK_JWK_URI=http://keycloak:8080/realms/microservices-realm/protocol/openid-connect/certs
       - PRODUCT_SERVICE_URL=http://product-service:8081
+      - ORDER_DB_URL=jdbc:postgresql://postgres-order:5432/orderdb
+      - ORDER_DB_USERNAME=order_user
+      - ORDER_DB_PASSWORD=order_pass
     depends_on:
       - discovery-service
       - keycloak
+      - postgres-order
 
-  frontend-angular:
-    build: ./frontend-angular
+  postgres-product:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=productdb
+      - POSTGRES_USER=product_user
+      - POSTGRES_PASSWORD=product_pass
     ports:
-      - "4200:80"
-    depends_on:
-      - gateway-service
+      - "5433:5432"
+    volumes:
+      - postgres-product-data:/var/lib/postgresql/data
+
+  postgres-order:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=orderdb
+      - POSTGRES_USER=order_user
+      - POSTGRES_PASSWORD=order_pass
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-order-data:/var/lib/postgresql/data
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.4.7
@@ -65,8 +88,16 @@ services:
       - KC_BOOTSTRAP_ADMIN_USERNAME=admin
       - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
       - KC_HTTP_PORT=8080
-      # Permet l'accès via localhost (navigateur) ET nom du conteneur (backend)
-      # Mais attention à l'issuer du token !
-      # En dev mode, keycloak est assez permissif.
     ports:
       - "8080:8080"
+
+  frontend-angular:
+    build: ./frontend-angular
+    ports:
+      - "4200:80"
+    depends_on:
+      - gateway-service
+
+volumes:
+  postgres-product-data:
+  postgres-order-data:

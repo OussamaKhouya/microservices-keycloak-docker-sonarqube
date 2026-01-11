@@ -15,10 +15,10 @@ spring:
             - Path=/product-service/**
           filters:
             - StripPrefix=1
-        - id: commande-service
-          uri: http://commande-service:8082
+        - id: order-service
+          uri: http://order-service:8082
           predicates:
-            - Path=/commande-service/**
+            - Path=/order-service/**
           filters:
             - StripPrefix=1
       default-filters:

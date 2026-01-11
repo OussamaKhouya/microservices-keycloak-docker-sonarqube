@@ -99,7 +99,7 @@ export class KeycloakService {
     }
 
     isUser(): boolean {
-        return this.hasRole('USER') || this.hasRole('ADMIN');
+        return this.hasRole('CLIENT') || this.hasRole('ADMIN');
     }
 
     login(): void {
